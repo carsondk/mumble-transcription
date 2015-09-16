@@ -45,7 +45,7 @@ mumble.connect( process.env.MUMBLE_URL, function( error, connectionRet ) {
         streams[user.session] = user.outputStream(true);
     });
     connection.on('user-move', function(user, fromChannel, toChannel, actor) {
-        console.log("User " + user.name + " moved from channel " + fromChannel.name + " to " + toChannel.name + " by " + actor.name );
+        console.log("User " + user.name + " moved from channel " + fromChannel.name + " to " + toChannel.name);
         if (toChannel.name == connection.user.channel.name) {
             console.log("Moved to my channel, adding stream...");
             streams[user.session] = user.outputStream(true);
@@ -65,7 +65,7 @@ mumble.connect( process.env.MUMBLE_URL, function( error, connectionRet ) {
 
 function make_mp3(user) {
     console.log(user);
-    var filename = user.name + Date.now() + ".wav";
+    var filename = user.session + Date.now() + ".wav";
 
     var proc = ffmpeg(streams[user.session])
         .on('end', function() {
