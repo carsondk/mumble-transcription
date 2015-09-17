@@ -3,9 +3,7 @@
 
 var fs = require( 'fs' );
 var mumble = require('mumble');
-var lame = require('lame');
 var ffmpeg = require('fluent-ffmpeg');
-var wav = require( 'wav' );
 
 var apiai = require('apiai');
 var app = apiai("76f825fd55dc4c399885c51b081401f4", "913a8022-2cc4-4ae3-aa54-6484a7b7567e");
@@ -100,11 +98,13 @@ function speech2text (filename, username) {
     request.on('response', function(response) {
         console.log(response);
         //connection.user.channel.sendMessage(username + ": " + response.result.resolvedQuery)
-        slack.send({
-            text: response.result.resolvedQuery,
-            channel: '#stenographer',
-            username: username
-        });
+        if( response.status.errorType === "success") {
+            slack.send({
+                text: response.result.resolvedQuery,
+                channel: '#stenographer',
+                username: username
+            });
+        }
     });
 
     request.on('error', function(error) {
