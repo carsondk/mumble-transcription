@@ -1,0 +1,8 @@
+mumble:
+  url: "<MUMBLE_URL>"
+apiai:
+  clientToken: "<API_AI_CLIENT_TOKEN>"
+  clientKey: "<API_AI_CLIENT_KEY>"
+slack:
+  hookUrl: "<SLACK_HOOK_URL>"
+  channel: "<SLACK_CHANNEL>"

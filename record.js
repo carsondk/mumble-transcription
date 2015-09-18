@@ -1,15 +1,26 @@
 
 "use strict";
 
+var stream = require('stream');
+
 var fs = require( 'fs' );
 var mumble = require('mumble');
 var ffmpeg = require('fluent-ffmpeg');
 
+var yaml = require('js-yaml');
+console.log(__dirname + '/config.yml');
+try {
+    var config = yaml.safeLoad(fs.readFileSync(__dirname + '/config.yml'));
+    console.log(config);
+} catch (e) {
+    console.log(e);
+}
+
 var apiai = require('apiai');
-var app = apiai("76f825fd55dc4c399885c51b081401f4", "913a8022-2cc4-4ae3-aa54-6484a7b7567e");
+var app = apiai(config.apiai.clientToken, config.apiai.clientKey);
 
 var Slack = require('node-slack');
-var slack = new Slack("https://hooks.slack.com/services/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");
+var slack = new Slack(config.slack.hookUrl);
 
 
 var unique = Date.now() % 10;
@@ -17,7 +28,7 @@ var streams = new Object();
 
 var connection;
 
-mumble.connect( process.env.MUMBLE_URL, function( error, connectionRet ) {
+mumble.connect( config.mumble.url, function( error, connectionRet ) {
     if( error ) { throw new Error( error ); }
 
     connection = connectionRet;
@@ -29,8 +40,6 @@ mumble.connect( process.env.MUMBLE_URL, function( error, connectionRet ) {
             var user = users[u];
             var username = user.name;
 
-            //var userConn = connection.userByName( username );
-            console.log( user.session );
             streams[user.session] = user.outputStream(true);
         }
     });
@@ -57,20 +66,54 @@ mumble.connect( process.env.MUMBLE_URL, function( error, connectionRet ) {
         console.log('voice-end ' + data.session + " " + data.name + " " + data.talking);
 
         var username = data.name;
-        make_mp3(data);
+        convert_and_send(data);
     });
 });
 
-function make_mp3(user) {
+
+// I had to use a passthrough stream here because it looks like ffmpeg end is not based on
+// stream ending. Got the end event before stream was actually done writing, and would
+// chop off end of voice.
+// This could all be fixed by making the voiceRequest streamable
+
+function convert_and_send(user) {
     console.log(user);
     var filename = user.session + Date.now() + ".wav";
 
-    var proc = ffmpeg(streams[user.session])
+// set up the apiai request
+    var request = app.voiceRequest();
+
+    request.on('response', function(response) {
+        console.log(response);
+        if( response.status.errorType === "success") {
+            slack.send({
+                text: response.result.resolvedQuery,
+                channel: config.slack.channel,
+                username: user.name
+            });
+        }
+    });
+
+    request.on('error', function(error) {
+        console.log(error);
+    });
+
+// set up a mediator pipe between apiai request and ffmpeg, described above
+    var passThrough = new stream.PassThrough();
+    passThrough.pipe(request.request, {end: false});
+
+    passThrough.on('end', function() {
+        request.end();
+    });
+
+    ffmpeg_convert(streams[user.session], passThrough);
+
+}
+
+function ffmpeg_convert(inputStream, outputStream) {
+    var proc = ffmpeg(inputStream)
         .on('end', function() {
             console.log('done processing input stream');
-            var userConn = connection.userBySession( user.session );
-            streams[user.session] = userConn.outputStream(true);
-            speech2text(filename, user.name);
         })
         .on('error', function(err) {
             console.log('an error happened: ' + err.message);
@@ -83,42 +126,12 @@ function make_mp3(user) {
             '-ar', '48k',
             '-ac', '1'
         )
-        .save(filename).outputOptions(
+        .output(outputStream)
+        .outputOptions(
             '-acodec', 'pcm_s16le',
             '-ar', '16k',
-            '-ac', '1');
-
-}
-
-function speech2text (filename, username) {
-    console.log("Sending off for speech2text");
-   
-    var request = app.voiceRequest();
-
-    request.on('response', function(response) {
-        console.log(response);
-        //connection.user.channel.sendMessage(username + ": " + response.result.resolvedQuery)
-        if( response.status.errorType === "success") {
-            slack.send({
-                text: response.result.resolvedQuery,
-                channel: '#stenographer',
-                username: username
-            });
-        }
-    });
-
-    request.on('error', function(error) {
-        console.log(error);
-    });
-
-    fs.readFile(filename, function(error, buffer) {
-        if (error) {
-            console.log(error);
-        } else {
-            request.write(buffer);
-        }
-
-        request.end();
-    });
+            '-ac', '1')
+        .format('wav')
+        .run()
 }
 
