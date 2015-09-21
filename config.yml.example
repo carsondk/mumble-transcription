@@ -6,3 +6,5 @@ apiai:
 slack:
   hookUrl: "<SLACK_HOOK_URL>"
   channel: "<SLACK_CHANNEL>"
+youtube:
+  apiKey: "<YOUTUBE_DATA_API_KEY>"
