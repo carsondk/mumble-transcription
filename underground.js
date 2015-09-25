@@ -1,4 +1,5 @@
-var YoutubeFinder = function (apiKey) {
+
+var YoutubeFinder = function () {
     var self = this;
     this.fs = require('fs');
     this.youtubedl = require('youtube-dl');
@@ -104,12 +105,18 @@ YoutubeFinder.prototype.download = function (videoId, callback) {
         .on('error', function(err) {
             console.log('An error happened: ' + err.message);
         })
+        .outputOptions(
+            '-ar', '48k',
+            '-ab', '99k',
+            '-ac', '1'
+        )
         .save(self.cacheDirectory+"/"+videoId + ".mp3");
 
 }
 
-var finder = new YoutubeFinder();
-finder.playFromSearch("Firework", function(file) {
-    console.log("Time to play: "+file);
-})
+//var finder = new YoutubeFinder();
+//finder.playFromSearch("Firework", function(file) {
+//    console.log("Time to play: "+file);
+//})
 
+module.exports = YoutubeFinder;
